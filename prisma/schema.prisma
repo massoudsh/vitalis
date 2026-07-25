@@ -1,0 +1,442 @@
+// Vitalis — Clinical Eldercare Operations Platform
+// Data model v0.1 — see /docs/ARCHITECTURE.md and /docs/MVP_SCOPE.md for rationale
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Tenant & Identity
+// ─────────────────────────────────────────────
+
+enum FacilityType {
+  NURSING_HOME // خانه سالمند اقامتی
+  DAY_CARE // مراقبت روزانه
+  HOME_CARE // مراقبت در منزل
+  REHAB // توانبخشی
+  HOSPITAL_LONG_TERM // بخش مراقبت طولانی‌مدت بیمارستان
+}
+
+model Facility {
+  id        String       @id @default(cuid())
+  name      String
+  type      FacilityType
+  timezone  String       @default("Asia/Tehran")
+  address   String?
+  phone     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  users     User[]
+  residents Resident[]
+  shifts    Shift[]
+  insights  AIInsight[]
+
+  @@map("facilities")
+}
+
+enum UserRole {
+  ADMIN
+  NURSE
+  CAREGIVER
+  DOCTOR
+  FAMILY_MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  facilityId  String
+  facility    Facility   @relation(fields: [facilityId], references: [id])
+  fullName    String
+  phone       String     @unique
+  email       String?    @unique
+  passwordHash String?
+  role        UserRole
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  shifts             Shift[]              @relation("StaffShifts")
+  vitalSignsRecorded VitalSign[]          @relation("VitalRecordedBy")
+  medAdministered    MedicationAdministration[] @relation("MedAdministeredBy")
+  careNotesAuthored  CareNote[]           @relation("CareNoteAuthor")
+  incidentsReported  IncidentReport[]     @relation("IncidentReportedBy")
+  handoffsFrom       HandoffNote[]        @relation("HandoffFromStaff")
+  handoffsTo         HandoffNote[]        @relation("HandoffToStaff")
+  familyReportsSent  FamilyReport[]       @relation("FamilyReportApprovedBy")
+  familyLinks        FamilyMember[]       @relation("FamilyPortalUser")
+  insightReviews     AIInsight[]          @relation("InsightReviewedBy")
+
+  @@index([facilityId])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// Resident
+// ─────────────────────────────────────────────
+
+enum ResidentStatus {
+  ACTIVE
+  DISCHARGED
+  DECEASED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model Resident {
+  id              String         @id @default(cuid())
+  facilityId      String
+  facility        Facility       @relation(fields: [facilityId], references: [id])
+  fullName        String
+  nationalId      String?
+  birthDate       DateTime
+  gender          Gender
+  roomNumber      String?
+  admissionDate   DateTime       @default(now())
+  dischargeDate   DateTime?
+  status          ResidentStatus @default(ACTIVE)
+  riskLevel       RiskLevel      @default(LOW)
+  primaryDiagnosis String?
+  allergies       String?
+  photoUrl        String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  familyMembers   FamilyMember[]
+  medications     Medication[]
+  vitalSigns      VitalSign[]
+  careNotes       CareNote[]
+  incidents       IncidentReport[]
+  medAdmins       MedicationAdministration[]
+  handoffNotes    HandoffNote[]
+  familyReports   FamilyReport[]
+  aiInsights      AIInsight[]
+
+  @@index([facilityId])
+  @@index([riskLevel])
+  @@map("residents")
+}
+
+enum FamilyRelation {
+  CHILD
+  SPOUSE
+  SIBLING
+  GRANDCHILD
+  GUARDIAN
+  OTHER
+}
+
+model FamilyMember {
+  id          String         @id @default(cuid())
+  residentId  String
+  resident    Resident       @relation(fields: [residentId], references: [id])
+  userId      String?        // در صورت داشتن دسترسی پورتال
+  user        User?          @relation("FamilyPortalUser", fields: [userId], references: [id])
+  fullName    String
+  relation    FamilyRelation
+  phone       String
+  notifyOnIncident Boolean   @default(true)
+  createdAt   DateTime       @default(now())
+
+  @@index([residentId])
+  @@map("family_members")
+}
+
+// ─────────────────────────────────────────────
+// Shift & Handoff
+// ─────────────────────────────────────────────
+
+enum ShiftType {
+  MORNING
+  EVENING
+  NIGHT
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+}
+
+model Shift {
+  id         String      @id @default(cuid())
+  facilityId String
+  facility   Facility    @relation(fields: [facilityId], references: [id])
+  staffId    String
+  staff      User        @relation("StaffShifts", fields: [staffId], references: [id])
+  type       ShiftType
+  status     ShiftStatus @default(SCHEDULED)
+  startTime  DateTime
+  endTime    DateTime
+  createdAt  DateTime    @default(now())
+
+  vitalSigns   VitalSign[]
+  careNotes    CareNote[]
+  incidents    IncidentReport[]
+  medAdmins    MedicationAdministration[]
+  handoffNotes HandoffNote[]
+
+  @@index([facilityId, startTime])
+  @@index([staffId])
+  @@map("shifts")
+}
+
+model HandoffNote {
+  id           String   @id @default(cuid())
+  shiftId      String
+  shift        Shift    @relation(fields: [shiftId], references: [id])
+  residentId   String?  // null یعنی یادداشت کلی مرکز، نه یک سالمند خاص
+  resident     Resident? @relation(fields: [residentId], references: [id])
+  fromStaffId  String
+  fromStaff    User     @relation("HandoffFromStaff", fields: [fromStaffId], references: [id])
+  toStaffId    String?
+  toStaff      User?    @relation("HandoffToStaff", fields: [toStaffId], references: [id])
+  content      String
+  aiSummary    String?  // پیش‌نویس تولیدشده توسط AI پیش از تأیید نهایی
+  priority     RiskLevel @default(LOW)
+  acknowledgedAt DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([shiftId])
+  @@index([residentId])
+  @@map("handoff_notes")
+}
+
+// ─────────────────────────────────────────────
+// Clinical Records
+// ─────────────────────────────────────────────
+
+model VitalSign {
+  id                     String   @id @default(cuid())
+  residentId             String
+  resident               Resident @relation(fields: [residentId], references: [id])
+  shiftId                String?
+  shift                  Shift?   @relation(fields: [shiftId], references: [id])
+  recordedById           String
+  recordedBy             User     @relation("VitalRecordedBy", fields: [recordedById], references: [id])
+  recordedAt             DateTime @default(now())
+  bloodPressureSystolic  Int?
+  bloodPressureDiastolic Int?
+  heartRate              Int?
+  temperature            Float?   // °C
+  spo2                   Int?     // %
+  respiratoryRate        Int?
+  bloodSugar             Float?   // mg/dL
+  weightKg               Float?
+  notes                  String?
+
+  @@index([residentId, recordedAt])
+  @@map("vital_signs")
+}
+
+enum MedicationRoute {
+  ORAL
+  INJECTION
+  TOPICAL
+  INHALED
+  OTHER
+}
+
+model Medication {
+  id             String          @id @default(cuid())
+  residentId     String
+  resident       Resident        @relation(fields: [residentId], references: [id])
+  name           String
+  dosage         String
+  route          MedicationRoute @default(ORAL)
+  frequency      String          // مثلا "هر ۸ ساعت" یا "روزی یکبار - صبح"
+  prescribedBy   String?
+  startDate      DateTime
+  endDate        DateTime?
+  instructions   String?
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+
+  administrations MedicationAdministration[]
+
+  @@index([residentId])
+  @@map("medications")
+}
+
+enum MedicationAdminStatus {
+  GIVEN
+  MISSED
+  REFUSED
+  DELAYED
+}
+
+model MedicationAdministration {
+  id                String                 @id @default(cuid())
+  medicationId      String
+  medication        Medication             @relation(fields: [medicationId], references: [id])
+  residentId        String
+  resident          Resident               @relation(fields: [residentId], references: [id])
+  shiftId           String?
+  shift             Shift?                 @relation(fields: [shiftId], references: [id])
+  administeredById  String
+  administeredBy    User                   @relation("MedAdministeredBy", fields: [administeredById], references: [id])
+  scheduledTime     DateTime
+  administeredTime  DateTime?
+  status            MedicationAdminStatus
+  notes             String?
+  createdAt         DateTime               @default(now())
+
+  @@index([residentId, scheduledTime])
+  @@map("medication_administrations")
+}
+
+enum CareNoteCategory {
+  NUTRITION
+  SLEEP
+  BEHAVIOR
+  PAIN
+  HYGIENE
+  MOOD
+  MOBILITY
+  OTHER
+}
+
+enum Severity {
+  NORMAL
+  WATCH
+  CONCERN
+  URGENT
+}
+
+model CareNote {
+  id         String           @id @default(cuid())
+  residentId String
+  resident   Resident         @relation(fields: [residentId], references: [id])
+  shiftId    String?
+  shift      Shift?           @relation(fields: [shiftId], references: [id])
+  authorId   String
+  author     User             @relation("CareNoteAuthor", fields: [authorId], references: [id])
+  category   CareNoteCategory
+  content    String
+  severity   Severity         @default(NORMAL)
+  createdAt  DateTime         @default(now())
+
+  @@index([residentId, createdAt])
+  @@map("care_notes")
+}
+
+enum IncidentType {
+  FALL // سقوط
+  PRESSURE_ULCER // زخم بستر
+  INJURY
+  MEDICATION_ERROR
+  BEHAVIORAL_EVENT
+  OTHER
+}
+
+model IncidentReport {
+  id               String       @id @default(cuid())
+  residentId       String
+  resident         Resident     @relation(fields: [residentId], references: [id])
+  shiftId          String?
+  shift            Shift?       @relation(fields: [shiftId], references: [id])
+  reportedById     String
+  reportedBy       User         @relation("IncidentReportedBy", fields: [reportedById], references: [id])
+  type             IncidentType
+  description      String
+  severity         Severity     @default(CONCERN)
+  actionTaken      String?
+  familyNotifiedAt DateTime?
+  createdAt        DateTime     @default(now())
+
+  @@index([residentId, createdAt])
+  @@map("incident_reports")
+}
+
+// ─────────────────────────────────────────────
+// Family Communication
+// ─────────────────────────────────────────────
+
+enum ReportChannel {
+  APP
+  SMS
+  EMAIL
+}
+
+model FamilyReport {
+  id             String        @id @default(cuid())
+  residentId     String
+  resident       Resident      @relation(fields: [residentId], references: [id])
+  periodStart    DateTime
+  periodEnd      DateTime
+  content        String
+  aiGenerated    Boolean       @default(true)
+  approvedById   String?
+  approvedBy     User?         @relation("FamilyReportApprovedBy", fields: [approvedById], references: [id])
+  channel        ReportChannel @default(APP)
+  sentAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([residentId, periodStart])
+  @@map("family_reports")
+}
+
+// ─────────────────────────────────────────────
+// AI Layer
+// ─────────────────────────────────────────────
+
+enum InsightType {
+  RISK_ALERT // هشدار ریسک (مثلا افت مکرر فشار یا تغذیه)
+  TREND // روند قابل توجه در طول زمان
+  SHIFT_SUMMARY // پیش‌نویس خلاصه تحویل شیفت
+  FAMILY_SUMMARY // پیش‌نویس گزارش خانواده
+  RECOMMENDATION // پیشنهاد اقدام برای تیم
+}
+
+enum InsightStatus {
+  NEW
+  REVIEWED
+  DISMISSED
+  ACTIONED
+}
+
+model AIInsight {
+  id              String        @id @default(cuid())
+  facilityId      String
+  facility        Facility      @relation(fields: [facilityId], references: [id])
+  residentId      String?
+  resident        Resident?     @relation(fields: [residentId], references: [id])
+  type            InsightType
+  title           String
+  content         String
+  severity        Severity      @default(WATCH)
+  sourceRecordIds Json          // آرایه‌ای از {model, id} که این insight از آن‌ها استخراج شده — برای ردیابی شفاف منبع
+  status          InsightStatus @default(NEW)
+  reviewedById    String?
+  reviewedBy      User?         @relation("InsightReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([facilityId, status])
+  @@index([residentId, createdAt])
+  @@map("ai_insights")
+}
