@@ -9,7 +9,7 @@
 ## وابستگی‌ها
 - [[concepts/care-timeline]] — union رکوردهای این سالمند به‌ترتیب زمان.
 - [[entities/family-member]] — اعضای خانواده مرتبط.
-- صفحهٔ UI: `/residents/[id]` (نمای Care Timeline) — [[entities/web-routes]].
+- صفحهٔ UI: `/residents` (لیست واقعی)، `/residents/new` (فرم ثبت)، `/residents/[id]` (Care Timeline واقعی) — [[entities/web-routes]].
 
 ## قراردادها / Edge cases
 - `RiskLevel`: `LOW | MEDIUM | HIGH | CRITICAL` — دستی تنظیم می‌شود؛ در فاز ۲ از مدل پیش‌بینی ML به‌روزرسانی خواهد شد.
@@ -18,5 +18,6 @@
 
 ## منابع کد
 - `prisma/schema.prisma:89-141` — enum `ResidentStatus`/`RiskLevel`/`Gender` + model `Resident`
-- `src/app/residents/page.tsx` — لیست سالمندان (اسکلت، بدون کوئری دیتابیس)
-- `src/app/residents/[id]/page.tsx` — نمای Care Timeline (اسکلت)
+- `src/app/residents/page.tsx` — لیست سالمندان (کوئری واقعی Prisma، scope شده روی `facilityId`)
+- `src/app/residents/new/page.tsx` + `src/app/api/residents/route.ts` — فرم/API ثبت سالمند جدید (نقش `ADMIN`/`NURSE`)
+- `src/app/residents/[id]/page.tsx` — نمای Care Timeline (کوئری ترکیبی واقعی)

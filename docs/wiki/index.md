@@ -1,7 +1,7 @@
 # Index — Vitalis Wiki
 
 ## Overview
-- [[overview]] — یک‌نگاه کلی محصول و وضعیت فعلی (فاز ۰)
+- [[overview]] — یک‌نگاه کلی محصول و وضعیت فعلی (فاز ۱ — شروع‌شده)
 
 ## Entities (۱۰ صفحه)
 - [[entities/facility]] — مرکز مراقبت، واحد multi-tenancy
@@ -15,11 +15,12 @@
 - [[entities/ai-insight]] — خروجی لایهٔ AI با ردیابی منبع
 - [[entities/web-routes]] — نقشهٔ صفحات Next.js App Router
 
-## Concepts (۴ صفحه)
-- [[concepts/care-timeline]] — مفهوم مرکزی: union رکوردهای بالینی
+## Concepts (۵ صفحه)
+- [[concepts/care-timeline]] — مفهوم مرکزی: union رکوردهای بالینی (پیاده‌سازی واقعی)
 - [[concepts/rbac]] — نقش‌ها و مرزهای دسترسی
+- [[concepts/auth]] — پیاده‌سازی NextAuth Credentials + middleware guard
 - [[concepts/ai-layer]] — الگوی human-in-the-loop برای همهٔ خروجی‌های AI
-- [[concepts/phasing]] — وضعیت فاز ۰ → ۳
+- [[concepts/phasing]] — وضعیت فاز ۰ (تکمیل) → فاز ۱ (در حال انجام) → ۳
 
 ## Meta
 - [[schema]] — قوانین ساختار و لینک‌گذاری همین ویکی

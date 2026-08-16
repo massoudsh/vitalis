@@ -15,18 +15,46 @@ cp .env.example .env   # مقادیر DATABASE_URL و NEXTAUTH_SECRET را پر 
 npm install
 npm run prisma:generate
 npm run prisma:migrate
+npm run prisma:seed    # دادهٔ نمونه: مرکز + کاربر ادمین/پرستار + ۲ سالمند
 npm run dev
 ```
+
+ورود نمونه پس از seed: شماره موبایل `09120000001` (ادمین) یا `09120000002`
+(پرستار)، رمز عبور `password123`.
+
+## تست و کیفیت
+```bash
+npm run lint
+npm run typecheck
+npm test          # vitest — منطق rule-based در src/lib/insights.ts
+npm run build
+```
+همین دستورات در CI (`.github/workflows/ci.yml`) روی هر push/PR به `main` اجرا می‌شوند.
 
 ## ساختار پوشه‌ها
 ```
 prisma/schema.prisma       # مدل داده
+prisma/seed.ts              # دادهٔ نمونهٔ محلی (idempotent)
 src/app/                   # صفحات Next.js (App Router)
-  dashboard/                # داشبورد ادمین
-  residents/[id]/           # پروفایل و Care Timeline سالمند
-  shifts/                   # مدیریت شیفت
-  handoffs/                 # تحویل شیفت
-  family-portal/[residentId]/ # پورتال خانواده
+  login/                    # صفحهٔ ورود (NextAuth Credentials)
+  dashboard/                # داشبورد ادمین — کوئری واقعی Prisma
+  residents/                # لیست + افزودن سالمند (کوئری/فرم واقعی)
+  residents/[id]/           # Care Timeline واقعی (union ۵ مدل رکورد)
+  shifts/                   # مدیریت شیفت (هنوز اسکلت)
+  handoffs/                 # تحویل شیفت (هنوز اسکلت)
+  family-portal/[residentId]/ # پورتال خانواده (هنوز اسکلت)
+  api/auth/[...nextauth]/    # NextAuth route handler
+  api/residents/             # POST برای ثبت سالمند
 src/lib/prisma.ts           # کلاینت Prisma
+src/lib/auth.ts             # پیکربندی NextAuth (Credentials)
+src/lib/insights.ts         # منطق rule-based AI Insight (تست‌شده با vitest)
+middleware.ts                # گارد auth روی مسیرهای عملیاتی
 docs/                        # مستندات معماری و MVP
 ```
+
+## وضعیت فاز ۱
+پیاده‌شده: auth واقعی (NextAuth Credentials + RBAC پایه در middleware)، اتصال
+Prisma واقعی در داشبورد/سالمندان/Care Timeline، ثبت سالمند جدید، منطق
+rule-based AI Insight (تست‌شده). باقی‌مانده: فرم ثبت علائم حیاتی/MAR/یادداشت/حادثه،
+مدیریت شیفت واقعی، خلاصهٔ AI برای handoff، پورتال خانواده، و اتصال منطق
+Insight به جدول `AIInsight` و UI.

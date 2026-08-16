@@ -14,7 +14,11 @@
 - منبع اصلی برای [[concepts/ai-layer|AI Insight]]، [[entities/handoff-note]] و [[entities/family-report]].
 
 ## پیاده‌سازی فعلی
-`/residents/[id]` ([[entities/web-routes]]) قرار است این کوئری ترکیبی را اجرا کند — در فاز ۰ فقط توضیح متنی است، کوئری واقعی هنوز نوشته نشده.
+`/residents/[id]` ([[entities/web-routes]]) این کوئری را واقعاً اجرا می‌کند:
+۵ کوئری Prisma موازی (`Promise.all`) روی `residentId`، هر رکورد به یک شکل
+یکسان (`{type, at, summary, by, severity?}`) map می‌شود، سپس در حافظه بر
+اساس `at` (نزولی) مرتب و رندر می‌شود. فیلتر بر اساس نوع رکورد/بازهٔ زمانی
+هنوز اضافه نشده (قدم بعدی فاز ۱).
 
 ## وابستگی‌ها
 - [[entities/clinical-records]] — پنج مدل تشکیل‌دهنده.
@@ -23,3 +27,4 @@
 
 ## منابع کد
 - `docs/ARCHITECTURE.md` بخش «Care Timeline (مفهوم مرکزی)»
+- `src/app/residents/[id]/page.tsx` — پیاده‌سازی کوئری ترکیبی واقعی
