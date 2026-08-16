@@ -1,6 +1,8 @@
 # Noqte Platform
 .vibe/
 .noqte/
+uploads/
+outputs/
 
 # Dependencies
 node_modules/

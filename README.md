@@ -7,6 +7,7 @@ Platform).
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — معماری فنی، استک، RBAC، فازبندی
 - [`docs/MVP_SCOPE.md`](docs/MVP_SCOPE.md) — دامنهٔ دقیق نسخهٔ اول
 - [`prisma/schema.prisma`](prisma/schema.prisma) — مدل کامل داده
+- [`docs/wiki/index.md`](docs/wiki/index.md) — ویکی دانش پروژه (خلاصهٔ entity‌ها/concept‌ها، همگام با کد) — نسخهٔ آنلاین: [GitHub Wiki](https://github.com/massoudsh/vitalis/wiki)
 
 ## اجرای توسعه (روی سرور با دسترسی build، نه داخل کانتینر توسعه)
 ```bash
