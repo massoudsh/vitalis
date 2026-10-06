@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell, PageIntro, SectionCard } from "@/components/app-shell";
+import { VitalSignForm } from "@/components/vital-sign-form";
 
 const severityClass: Record<string, string> = { NORMAL: "bg-surface-muted text-muted-foreground", WATCH: "bg-amber-50 text-amber-700", CONCERN: "bg-orange-50 text-orange-700", URGENT: "bg-red-50 text-red-700" };
 const severityLabel: Record<string, string> = { NORMAL: "عادی", WATCH: "تحت نظر", CONCERN: "نگران‌کننده", URGENT: "فوری" };
@@ -49,6 +50,7 @@ export default async function ResidentTimelinePage({ params }: { params: { id: s
       <PageIntro eyebrow="Care Timeline" title={resident.fullName} description={`${resident.roomNumber ? `اتاق ${resident.roomNumber} · ` : ""}خط زمانی زندهٔ مراقبت از اولین تا آخرین رکورد ثبت‌شده.`} action={<span className={`rounded-full px-4 py-2 text-xs font-bold ${riskClass[resident.riskLevel]}`}>ریسک {riskLabel[resident.riskLevel]}</span>} />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_2fr]">
+        <div className="space-y-4">
         <SectionCard>
           <h2 className="text-sm font-black text-muted-foreground">خلاصهٔ پرونده</h2>
           <dl className="mt-4 space-y-3 text-sm">
@@ -59,6 +61,14 @@ export default async function ResidentTimelinePage({ params }: { params: { id: s
             <div className="flex items-center justify-between gap-3 border-t pt-3"><dt className="text-muted-foreground">تعداد رکوردها</dt><dd className="font-black text-brand">{items.length}</dd></div>
           </dl>
         </SectionCard>
+        {session.user.role !== "FAMILY_MEMBER" && (
+          <SectionCard>
+            <h2 className="text-lg font-black">ثبت علائم حیاتی</h2>
+            <p className="mt-1 text-sm text-muted-foreground">حداقل یک مقدار را وارد کنید.</p>
+            <div className="mt-5"><VitalSignForm residentId={resident.id} /></div>
+          </SectionCard>
+        )}
+        </div>
         <SectionCard>
           <div className="flex items-center justify-between"><div><h2 className="text-lg font-black">خط زمانی مراقبت</h2><p className="mt-1 text-sm text-muted-foreground">آخرین رخدادها بر اساس زمان ثبت</p></div><span className="rounded-xl bg-surface-muted px-3 py-2 text-xs font-bold">{items.length} رکورد</span></div>
           {items.length === 0 ? <div className="py-12 text-center"><p className="font-black">هنوز رکوردی ثبت نشده</p><p className="mt-1 text-sm text-muted-foreground">اولین رکورد مراقبت این سالمند را ثبت کنید.</p></div> : (
