@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell, PageIntro, SectionCard } from "@/components/app-shell";
 import { VitalSignForm } from "@/components/vital-sign-form";
+import { CareRecordForm } from "@/components/care-record-form";
+import { ResidentProfileForm } from "@/components/resident-profile-form";
 
 const severityClass: Record<string, string> = { NORMAL: "bg-surface-muted text-muted-foreground", WATCH: "bg-amber-50 text-amber-700", CONCERN: "bg-orange-50 text-orange-700", URGENT: "bg-red-50 text-red-700" };
 const severityLabel: Record<string, string> = { NORMAL: "عادی", WATCH: "تحت نظر", CONCERN: "نگران‌کننده", URGENT: "فوری" };
@@ -21,19 +23,20 @@ const typeMeta: Record<string, { icon: string; tone: string }> = {
 
 type TimelineItem = { id: string; type: string; at: Date; summary: string; by: string; severity?: string };
 
-export default async function ResidentTimelinePage({ params }: { params: { id: string } }) {
+export default async function ResidentTimelinePage({ params, searchParams }: { params: { id: string }; searchParams: { type?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
   const resident = await prisma.resident.findFirst({ where: { id: params.id, facilityId: session.user.facilityId } });
   if (!resident) notFound();
 
-  const [vitals, medAdmins, careNotes, incidents, handoffs] = await Promise.all([
+  const [vitals, medAdmins, careNotes, incidents, handoffs, medications] = await Promise.all([
     prisma.vitalSign.findMany({ where: { residentId: resident.id }, include: { recordedBy: true } }),
     prisma.medicationAdministration.findMany({ where: { residentId: resident.id }, include: { medication: true, administeredBy: true } }),
     prisma.careNote.findMany({ where: { residentId: resident.id }, include: { author: true } }),
     prisma.incidentReport.findMany({ where: { residentId: resident.id }, include: { reportedBy: true } }),
     prisma.handoffNote.findMany({ where: { residentId: resident.id }, include: { fromStaff: true } }),
+    prisma.medication.findMany({ where: { residentId: resident.id, active: true }, select: { id: true, name: true, dosage: true } }),
   ]);
 
   const items: TimelineItem[] = [
@@ -43,6 +46,8 @@ export default async function ResidentTimelinePage({ params }: { params: { id: s
     ...incidents.map((i) => ({ id: i.id, type: "حادثه", at: i.createdAt, summary: i.description, by: i.reportedBy.fullName, severity: i.severity })),
     ...handoffs.map((h) => ({ id: h.id, type: "تحویل شیفت", at: h.createdAt, summary: h.content, by: h.fromStaff.fullName })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  const filteredItems = searchParams.type ? items.filter((item) => item.type === searchParams.type) : items;
 
   return (
     <AppShell userName={session.user.name}>
@@ -58,22 +63,31 @@ export default async function ResidentTimelinePage({ params }: { params: { id: s
             <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">تاریخ پذیرش</dt><dd className="font-bold">{resident.admissionDate.toLocaleDateString("fa-IR")}</dd></div>
             <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">تشخیص اصلی</dt><dd className="font-bold">{resident.primaryDiagnosis ?? "ثبت‌نشده"}</dd></div>
             <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">آلرژی‌ها</dt><dd className="font-bold">{resident.allergies ?? "ثبت‌نشده"}</dd></div>
-            <div className="flex items-center justify-between gap-3 border-t pt-3"><dt className="text-muted-foreground">تعداد رکوردها</dt><dd className="font-black text-brand">{items.length}</dd></div>
+            {(["ADMIN", "NURSE"] as string[]).includes(session.user.role) && <div className="mt-4 border-t pt-4"><ResidentProfileForm resident={{ id: resident.id, fullName: resident.fullName, roomNumber: resident.roomNumber, riskLevel: resident.riskLevel, primaryDiagnosis: resident.primaryDiagnosis, allergies: resident.allergies, status: resident.status }} /></div>}
           </dl>
         </SectionCard>
         {session.user.role !== "FAMILY_MEMBER" && (
-          <SectionCard>
-            <h2 className="text-lg font-black">ثبت علائم حیاتی</h2>
-            <p className="mt-1 text-sm text-muted-foreground">حداقل یک مقدار را وارد کنید.</p>
-            <div className="mt-5"><VitalSignForm residentId={resident.id} /></div>
-          </SectionCard>
+          <>
+            <SectionCard>
+              <h2 className="text-lg font-black">ثبت علائم حیاتی</h2>
+              <p className="mt-1 text-sm text-muted-foreground">حداقل یک مقدار را وارد کنید.</p>
+              <div className="mt-5"><VitalSignForm residentId={resident.id} /></div>
+            </SectionCard>
+            <SectionCard>
+              <h2 className="text-lg font-black">ثبت رکورد مراقبت</h2>
+              <p className="mt-1 text-sm text-muted-foreground">یادداشت، حادثه، دارو یا مصرف دارو را ثبت کنید.</p>
+              <div className="mt-5"><CareRecordForm residentId={resident.id} medications={medications} /></div>
+            </SectionCard>
+          </>
         )}
         </div>
         <SectionCard>
-          <div className="flex items-center justify-between"><div><h2 className="text-lg font-black">خط زمانی مراقبت</h2><p className="mt-1 text-sm text-muted-foreground">آخرین رخدادها بر اساس زمان ثبت</p></div><span className="rounded-xl bg-surface-muted px-3 py-2 text-xs font-bold">{items.length} رکورد</span></div>
-          {items.length === 0 ? <div className="py-12 text-center"><p className="font-black">هنوز رکوردی ثبت نشده</p><p className="mt-1 text-sm text-muted-foreground">اولین رکورد مراقبت این سالمند را ثبت کنید.</p></div> : (
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-black">خط زمانی مراقبت</h2><p className="mt-1 text-sm text-muted-foreground">آخرین رخدادها بر اساس زمان ثبت</p></div><span className="rounded-xl bg-surface-muted px-3 py-2 text-xs font-bold">{filteredItems.length} رکورد</span></div>
+          <div className="mt-5 flex flex-wrap gap-2 border-b pb-4"><Link href={`/residents/${resident.id}`} className={`rounded-full px-3 py-1 text-xs font-bold ${!searchParams.type ? "bg-foreground text-white" : "bg-surface-muted text-muted-foreground"}`}>همه</Link>{["علائم حیاتی", "دارو", "یادداشت مراقبتی", "حادثه", "تحویل شیفت"].map((filter) => <Link key={filter} href={`/residents/${resident.id}?type=${encodeURIComponent(filter)}`} className={`rounded-full px-3 py-1 text-xs font-bold ${searchParams.type === filter ? "bg-brand text-white" : "bg-surface-muted text-muted-foreground"}`}>{filter}</Link>)}</div>
+          <div className="flex flex-wrap gap-2 border-b pb-4"><Link href={`/residents/${resident.id}`} className={`rounded-full px-3 py-1 text-xs font-bold ${!searchParams.type ? "bg-foreground text-white" : "bg-surface-muted text-muted-foreground"}`}>همه</Link>{["علائم حیاتی", "دارو", "یادداشت مراقبتی", "حادثه", "تحویل شیفت"].map((filter) => <Link key={filter} href={`/residents/${resident.id}?type=${encodeURIComponent(filter)}`} className={`rounded-full px-3 py-1 text-xs font-bold ${searchParams.type === filter ? "bg-brand text-white" : "bg-surface-muted text-muted-foreground"}`}>{filter}</Link>)}</div>
+          {filteredItems.length === 0 ? <div className="py-12 text-center"><p className="font-black">هنوز رکوردی ثبت نشده</p><p className="mt-1 text-sm text-muted-foreground">اولین رکورد مراقبت این سالمند را ثبت کنید.</p></div> : (
             <ol className="mt-6 space-y-4">
-              {items.map((item) => { const meta = typeMeta[item.type] ?? { icon: "•", tone: "bg-surface-muted text-muted-foreground" }; return (
+              {filteredItems.map((item) => { const meta = typeMeta[item.type] ?? { icon: "•", tone: "bg-surface-muted text-muted-foreground" }; return (
                 <li key={`${item.type}-${item.id}`} className="flex gap-4">
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black ${meta.tone}`}>{meta.icon}</span>
                   <div className="flex-1 rounded-2xl border bg-background p-4">
