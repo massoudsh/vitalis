@@ -1,40 +1,17 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { AppShell, PageIntro, SectionCard } from "@/components/app-shell";
+import { ShiftForm, ShiftStatusButton } from "@/components/shift-controls";
 
-const shifts = [
-  { name: "صبح", time: "۰۶:۰۰ تا ۱۴:۰۰", staff: "۲ نفر", tone: "bg-amber-50 text-amber-700" },
-  { name: "عصر", time: "۱۴:۰۰ تا ۲۲:۰۰", staff: "۲ نفر", tone: "bg-blue-50 text-blue-700" },
-  { name: "شب", time: "۲۲:۰۰ تا ۰۶:۰۰", staff: "۱ نفر", tone: "bg-surface-muted text-muted-foreground" },
-];
-
+const typeLabel: Record<string, string> = { MORNING: "صبح", EVENING: "عصر", NIGHT: "شب" };
+const statusLabel: Record<string, string> = { SCHEDULED: "زمان‌بندی‌شده", IN_PROGRESS: "در حال انجام", COMPLETED: "تکمیل‌شده", MISSED: "از دست‌رفته" };
 export default async function ShiftsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-
-  return (
-    <AppShell userName={session.user.name}>
-      <PageIntro eyebrow="برنامه‌ریزی" title="شیفت‌ها" description="تقویم هفتگی شیفت‌ها و تخصیص پرسنل به هر بازهٔ کاری." action={<button className="button-primary">+ شیفت جدید</button>} />
-      <div className="grid gap-4 lg:grid-cols-3">
-        {shifts.map((shift) => (
-          <SectionCard key={shift.name}>
-            <div className="flex items-center justify-between"><h2 className="text-lg font-black">شیفت {shift.name}</h2><span className={`rounded-xl px-3 py-1 text-xs font-bold ${shift.tone}`}>امروز</span></div>
-            <p className="mt-4 text-sm text-muted-foreground">بازهٔ کاری</p>
-            <p className="font-bold">{shift.time}</p>
-            <div className="mt-4 flex items-center justify-between border-t pt-4"><span className="text-sm text-muted-foreground">پرسنل تخصیص‌یافته</span><span className="text-sm font-black">{shift.staff}</span></div>
-          </SectionCard>
-        ))}
-      </div>
-      <SectionCard className="mt-6">
-        <h2 className="text-lg font-black">تقویم هفتگی</h2>
-        <p className="mt-1 text-sm text-muted-foreground">نمای هفتگی تخصیص پرسنل به شیفت‌ها پس از اتصال دادهٔ واقعی نمایش داده می‌شود.</p>
-        <div className="mt-6 grid grid-cols-7 gap-2 text-center">
-          {["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"].map((day) => (
-            <div key={day} className="rounded-2xl border bg-background p-3"><p className="text-xs font-bold">{day}</p><p className="mt-2 text-xs text-muted-foreground">—</p></div>
-          ))}
-        </div>
-      </SectionCard>
-    </AppShell>
-  );
+  const session = await getServerSession(authOptions); if (!session) redirect("/login");
+  const [shifts, staff] = await Promise.all([
+    prisma.shift.findMany({ where: { facilityId: session.user.facilityId }, include: { staff: true }, orderBy: { startTime: "desc" }, take: 30 }),
+    prisma.user.findMany({ where: { facilityId: session.user.facilityId, status: "ACTIVE", role: { in: ["ADMIN", "NURSE", "CAREGIVER"] } }, select: { id: true, fullName: true }, orderBy: { fullName: "asc" } }),
+  ]);
+  return <AppShell userName={session.user.name}><div className="relative"><PageIntro eyebrow="برنامه‌ریزی" title="شیفت‌ها" description="تقویم و وضعیت واقعی شیفت‌های مرکز را مدیریت کنید." action={<ShiftForm staff={staff} />} /></div><SectionCard className="overflow-hidden p-0"><div className="hidden grid-cols-[0.7fr_1fr_1fr_1fr_0.8fr] gap-4 border-b bg-surface-muted/50 px-6 py-4 text-xs font-bold text-muted-foreground md:grid"><span>نوع</span><span>شروع</span><span>پایان</span><span>پرسنل</span><span>وضعیت</span></div>{shifts.length===0?<div className="p-12 text-center text-sm text-muted-foreground">هنوز شیفتی ثبت نشده است.</div>:<ul className="divide-y">{shifts.map((shift)=><li key={shift.id} className="grid gap-2 px-5 py-4 md:grid-cols-[0.7fr_1fr_1fr_1fr_0.8fr] md:items-center md:gap-4 md:px-6"><span className="font-black">شیفت {typeLabel[shift.type]}</span><span className="text-sm text-muted-foreground">{shift.startTime.toLocaleString("fa-IR")}</span><span className="text-sm text-muted-foreground">{shift.endTime.toLocaleString("fa-IR")}</span><span className="text-sm font-bold">{shift.staff.fullName}</span><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{statusLabel[shift.status]}</span><ShiftStatusButton id={shift.id} status={shift.status}/></div></li>)}</ul>}</SectionCard></AppShell>;
 }
