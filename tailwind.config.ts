@@ -10,6 +10,7 @@ const config: Config = {
         "surface-muted": "var(--surface-muted)",
         foreground: "var(--foreground)",
         muted: "var(--muted)",
+        "muted-foreground": "var(--muted)",
         border: "var(--border)",
         brand: "var(--brand)",
         "brand-dark": "var(--brand-dark)",
